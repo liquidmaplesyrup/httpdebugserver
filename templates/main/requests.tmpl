@@ -1,0 +1,32 @@
+{{ define "main/requests.tmpl" }}
+Mock URL: {{ .mockUrl }}
+
+UUID: {{ .uuid }}
+
+<h3>Requests:</h3>
+
+{{ range .requests }}
+<h2> {{.Timestamp}} </h2>
+  <pre>{{ .Request }}</pre>
+
+{{ end }}
+<div id="requests"> </div>
+<script>
+const evtSource = new EventSource("/request_stream/{{ .uuid }}");
+
+evtSource.onmessage = function(event) {
+
+  console.log(event);
+    const pre = document.createElement("pre");
+    pre.innerHTML = JSON.parse(event.data).Request
+
+
+   const requests = document.getElementById("requests");
+
+  // newElement.textContent = "message: " + event.data;
+    requests.appendChild(pre);
+}
+
+</script>
+
+{{ end }}

@@ -1,0 +1,15 @@
+{{ define "main/index.tmpl" }}
+<html>
+  <body>
+  <h1>
+    {{ .title }}
+  </h1>
+
+  <form action="/request/{{ .uuid }}" method="get" accept-charset="utf-8">
+    <button type="submit">Get requests</button>
+  </form>
+    
+  </body>
+</html>
+{{ end }}
+
