@@ -19,7 +19,7 @@ type Request struct {
 }
 
 func main() {
-	requestStore := make(map[string](chan Request))
+	requestStore := make(map[string]map[(chan Request)]bool)
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/**/*")
 
@@ -31,7 +31,7 @@ func main() {
 
 	r.GET("/", func(c *gin.Context) {
 		uuid := uuid.NewString()
-		requestStore[uuid] = make(chan Request, 10)
+
 		c.HTML(http.StatusOK, "main/index.tmpl", gin.H{
 			"title": "httpdebugserver.com",
 			"uuid":  uuid,
@@ -57,17 +57,32 @@ func main() {
 
 			}() */
 		uuid := c.Param("uuid")
-		chanStream := requestStore[uuid]
+		if _,ok := requestStore[uuid] ; !ok {
+			requestStore[uuid] = make(map[(chan Request)]bool)
+		}
+
+		chanStream := make(chan Request, 10)
+		requestStore[uuid][chanStream] = true
+
 		// ensure nginx doesn't buffer this response but sends the chunks rightaway
 		c.Writer.Header().Set("X-Accel-Buffering", "no")
 
 		c.Stream(func(w io.Writer) bool {
-			if msg, ok := <-chanStream; ok {
-				fmt.Println("emitting")
+
+			fmt.Println("emitting")
+
+			select {
+			case res := <-c.Request.Context().Done():
+				fmt.Println(res)
+				fmt.Println("Done executing")
+				delete(requestStore[uuid], chanStream)
+				fmt.Println("Length", len(requestStore[uuid]))
+				return false
+			case msg := <-chanStream:
 				c.SSEvent("message", msg)
 				return true
 			}
-			return false
+
 		})
 	})
 
@@ -87,7 +102,11 @@ func main() {
 		requests := requestStore[uuid]
 		bytes, _ := httputil.DumpRequest(c.Request, true)
 
-		requests <- Request{Timestamp: time.Now(), Request: string(bytes)}
+		for key, _ := range requests {
+			// index is the index where we are
+			// element is the element from someSlice for where we are
+			key <- Request{Timestamp: time.Now(), Request: string(bytes)}
+		}
 
 		c.JSON(200, gin.H{
 			"message": "ok",
